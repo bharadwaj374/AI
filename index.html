@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Robo-Judge: The ML Showdown</title>
+<style>
+:root{--bg:#fff8e7;--card:#fff;--ink:#222;--mut:#666;--acc:#ff5d73;--ok:#1fa971;--bad:#e0344b;--bd:#222;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1830;--card:#2a2650;--ink:#f4f1ff;--mut:#b4aedb;--acc:#ff7a8c;--ok:#3ddc97;--bad:#ff6b81;--bd:#f4f1ff}}
+:root[data-theme="dark"]{--bg:#1b1830;--card:#2a2650;--ink:#f4f1ff;--mut:#b4aedb;--acc:#ff7a8c;--ok:#3ddc97;--bad:#ff6b81;--bd:#f4f1ff}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS",Verdana,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:16px}
+.wrap{width:100%;max-width:640px}
+h1{font-size:1.6rem;margin:.2em 0;text-align:center}
+.box{background:var(--card);border:3px solid var(--bd);border-radius:18px;padding:16px;box-shadow:5px 5px 0 var(--bd);margin:12px 0}
+.bot{font-size:3rem;text-align:center}
+.bot.shake{animation:sh .4s}.bot.hop{animation:hp .4s}
+@keyframes sh{25%{transform:translateX(-12px) rotate(-8deg)}75%{transform:translateX(12px) rotate(8deg)}}
+@keyframes hp{50%{transform:translateY(-18px) scale(1.15)}}
+.hud{display:flex;justify-content:space-between;font-weight:bold}
+.bar{height:10px;background:var(--bg);border:2px solid var(--bd);border-radius:8px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--acc);width:100%}
+.title{font-weight:bold;font-size:1.1rem;color:var(--acc)}
+.scn{font-size:1.1rem;line-height:1.45;margin-top:6px}
+button{font:inherit;cursor:pointer;color:var(--ink);background:var(--card);border:3px solid var(--bd);border-radius:12px;padding:12px;text-align:left;box-shadow:3px 3px 0 var(--bd)}
+button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--bd)}
+button:disabled{cursor:default;opacity:.85}
+.opts{display:grid;gap:10px;margin-top:10px}
+.opts button.ok{background:var(--ok);color:#000}.opts button.bad{background:var(--bad);color:#000}
+.opts button.gone{opacity:.25;text-decoration:line-through}
+.big{background:var(--acc);color:#000;text-align:center;font-weight:bold;font-size:1.15rem;width:100%}
+.say{font-style:italic;margin-top:8px}.why{color:var(--mut);margin-top:6px}
+.hide{display:none}.c{text-align:center}
+canvas{width:100%;height:340px;display:block;border:3px solid var(--bd);border-radius:12px;background:var(--bg);touch-action:none;cursor:crosshair}
+.hint{background:var(--ok);color:#000;border-radius:10px;padding:6px 10px;margin-top:8px;font-weight:bold}
+</style></head><body><div class="wrap">
+<h1>⚖️ Robo-Judge: The ML Showdown</h1>
+
+<div id="start" class="box c">
+<div class="bot">🤖</div>
+<p><b>Judge Botsworth</b> won’t hear a case until you’ve blasted some bubbles! 🫧<br>
+Round 1: <b>shoot bubbles for 12 seconds</b> (tap/click to fire). Round 2: decide which <b>type of machine learning</b> the case uses. Repeat!<br>
+Pop <b>8+ bubbles</b> to unlock a 🎁 hint (two wrong answers vanish). Wrong answers get roasted. 🔥</p>
+<button class="big" onclick="startGame()">Enter the Courtroom</button>
+</div>
+
+<div id="game" class="hide"><div class="box">
+<div class="hud"><span id="sc">Score: 0</span><span id="st">🔥 0</span><span id="lv">🔋🔋🔋</span></div>
+<div class="bar"><i id="tm"></i></div>
+
+<div id="arena">
+<div class="title" id="atl"></div>
+<canvas id="cv"></canvas>
+<div class="c" id="aInfo"></div>
+</div>
+
+<div id="qa" class="hide">
+<div class="bot" id="bot">🤖</div>
+<div class="title" id="ttl"></div>
+<div class="scn" id="scn"></div>
+<div class="hint hide" id="hnt">🎁 Hint unlocked: two wrong answers removed!</div>
+<div class="opts" id="opts"></div>
+<div class="say" id="say"></div><div class="why" id="why"></div>
+<button class="big hide" id="nx" onclick="next()" style="margin-top:12px">Next ➡️</button>
+</div>
+</div></div>
+
+<div id="end" class="box c hide">
+<div class="bot" id="eb">🏆</div>
+<h2 id="rank"></h2><p id="fin"></p>
+<button class="big" onclick="startGame()">Play again 🔁</button>
+</div>
+</div>
+<script>
+const T={SC:"Supervised: classification",SR:"Supervised: regression",UC:"Unsupervised: clustering",UA:"Unsupervised: anomaly detection",RL:"Reinforcement learning"};
+const Q=[
+{t:"🏦 The Case of the Sneaky Transactions",s:"A bank trains a model on transactions labelled fraudulent or legitimate.",a:"SC",w:"Known target labels are provided."},
+{t:"🛍️ The Mystery of the Shopaholics",s:"A shopping application groups customers by purchasing patterns without predefined categories.",a:"UC",w:"The model discovers groups from data."},
+{t:"🤖 The Robot Who Hated Walls",s:"A robot improves by receiving rewards for reaching a goal and penalties for collisions.",a:"RL",w:"The agent learns from actions and rewards."},
+{t:"🎓 The Exam Fortune Teller",s:"A university predicts a student’s final examination mark using historical records with known marks.",a:"SR",w:"The output is a numerical value."},
+{t:"🕵️ The Network Night Watch",s:"A security analyst flags unusual network records when most records have no labels.",a:"UA",w:"An unsupervised technique can flag unusual observations for review."},
+{t:"♟️ The Grandmaster Wannabe",s:"An AI learns which chess moves produce better long-term outcomes by playing games.",a:"RL",w:"The agent learns a strategy through repeated outcomes."}
+];
+const good=["Objection overruled… you’re right! 👏","Correct! Even my toaster is impressed.","Nailed it. Have a digital cookie. 🍪","Brilliant! Hire this student immediately.","Yes! My circuits are tingling. ⚡"];
+const bad=["Wrong! My coffee maker answered faster. ☕","Bzzzt! Did you guess with a coin? 🪙","Objection SUSTAINED… against your answer. 😬","My grandma’s Wi-Fi router knows better. 📶","Ouch. Please revisit Week 1. 📚"];
+const late=["Time’s up! Even a loading bar is faster. ⏳","You were thinking so hard, I aged. 👴"];
+const ROUND=12, NEED=8;
+let i,sc,st,lives,best,order,timer,left,done,hint,popped,raf;
+const $=id=>document.getElementById(id);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function hud(){$("sc").textContent="Score: "+sc;$("st").textContent="🔥 "+st;$("lv").textContent="🔋".repeat(lives)+"🪫".repeat(3-lives)}
+
+function startGame(){order=[...Q].sort(()=>Math.random()-.5);i=0;sc=0;st=0;lives=3;best=0;
+$("start").classList.add("hide");$("end").classList.add("hide");$("game").classList.remove("hide");arena()}
+
+/* ---------- BUBBLE ROUND ---------- */
+const cv=$("cv"),cx=cv.getContext("2d");
+let W,H,bubs,shots,parts,aim,cool,tLeft,last;
+const EM=["🧠","📊","🤖","🔬","📡","🧪","🕵️","💡"];
+function arena(){
+$("qa").classList.add("hide");$("arena").classList.remove("hide");hud();
+$("atl").textContent="🫧 Bubble Warm-up before Case "+(i+1)+"/"+order.length;
+$("aInfo").textContent="Aim and tap to shoot. Pop "+NEED+"+ for a hint!";
+W=cv.clientWidth;H=cv.clientHeight;cv.width=W;cv.height=H;
+bubs=[];shots=[];parts=[];popped=0;cool=0;tLeft=ROUND;aim={x:W/2,y:0};last=performance.now();
+for(let k=0;k<9;k++)spawn(true);
+cancelAnimationFrame(raf);loop(last)}
+function spawn(init){
+const r=22+Math.random()*10;
+bubs.push({x:r+Math.random()*(W-2*r),y:init?Math.random()*(H*.55):-r,r,vx:(Math.random()-.5)*60,vy:25+Math.random()*35,h:Math.floor(Math.random()*360),e:pick(EM),gold:Math.random()<.12})}
+function fire(x,y){
+if(cool>0)return;cool=.22;
+const ox=W/2,oy=H-14,dx=x-ox,dy=y-oy,d=Math.hypot(dx,dy)||1;
+shots.push({x:ox,y:oy,vx:dx/d*850,vy:dy/d*850})}
+cv.addEventListener("pointermove",e=>{const b=cv.getBoundingClientRect();aim={x:(e.clientX-b.left)*W/b.width,y:(e.clientY-b.top)*H/b.height}});
+cv.addEventListener("pointerdown",e=>{const b=cv.getBoundingClientRect();aim={x:(e.clientX-b.left)*W/b.width,y:(e.clientY-b.top)*H/b.height};fire(aim.x,aim.y)});
+function loop(now){
+const dt=Math.min(.05,(now-last)/1000);last=now;
+tLeft-=dt;cool-=dt;$("tm").style.width=(tLeft/ROUND*100)+"%";
+if(Math.random()<dt*1.6&&bubs.length<12)spawn(false);
+bubs.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.x<b.r||b.x>W-b.r)b.vx*=-1;if(b.y>H-60)b.y=-b.r});
+shots.forEach(s=>{s.x+=s.vx*dt;s.y+=s.vy*dt;
+for(let k=bubs.length-1;k>=0;k--){const b=bubs[k];if(Math.hypot(b.x-s.x,b.y-s.y)<b.r+6){
+const pts=b.gold?25:10;sc+=pts;popped++;parts.push({x:b.x,y:b.y,t:.7,txt:"+"+pts});$("aInfo").textContent="Popped: "+popped+(popped>=NEED?" ✅ hint unlocked!":" / "+NEED);hud();
+bubs.splice(k,1);s.dead=true;break}}
+if(s.x<-10||s.x>W+10||s.y<-10)s.dead=true});
+shots=shots.filter(s=>!s.dead);parts.forEach(p=>{p.t-=dt;p.y-=40*dt});parts=parts.filter(p=>p.t>0);
+draw();
+if(tLeft<=0){endArena();return}
+raf=requestAnimationFrame(loop)}
+function draw(){
+cx.clearRect(0,0,W,H);cx.textAlign="center";cx.textBaseline="middle";
+bubs.forEach(b=>{cx.beginPath();cx.arc(b.x,b.y,b.r,0,7);cx.fillStyle=b.gold?"rgba(255,200,40,.85)":"hsla("+b.h+",85%,60%,.55)";cx.fill();cx.lineWidth=3;cx.strokeStyle="rgba(255,255,255,.8)";cx.stroke();cx.font=(b.r*.95)+"px serif";cx.fillText(b.gold?"⭐":b.e,b.x,b.y+1)});
+shots.forEach(s=>{cx.beginPath();cx.arc(s.x,s.y,6,0,7);cx.fillStyle="#ff5d73";cx.fill()});
+const ox=W/2,oy=H-14,a=Math.atan2(aim.y-oy,aim.x-ox);
+cx.strokeStyle="rgba(255,93,115,.6)";cx.setLineDash([6,8]);cx.lineWidth=2;cx.beginPath();cx.moveTo(ox,oy);cx.lineTo(ox+Math.cos(a)*90,oy+Math.sin(a)*90);cx.stroke();cx.setLineDash([]);
+cx.font="34px serif";cx.fillText("🔫",ox,oy+4);
+cx.font="bold 18px Trebuchet MS";cx.fillStyle="#1fa971";parts.forEach(p=>cx.fillText(p.txt,p.x,p.y));
+cx.fillStyle="#888";cx.font="14px Trebuchet MS";cx.textAlign="left";cx.fillText(Math.ceil(Math.max(0,tLeft))+"s",8,16)}
+function endArena(){
+hint=popped>=NEED;
+$("aInfo").textContent=hint?"🎁 "+popped+" bubbles popped! Hint unlocked. Entering court…":popped+" bubbles popped. No hint this time. Entering court…";
+setTimeout(show,1300)}
+
+/* ---------- QUESTION ROUND ---------- */
+function show(){
+const q=order[i];done=false;hud();
+$("arena").classList.add("hide");$("qa").classList.remove("hide");
+$("bot").textContent="🤖";$("ttl").textContent="Case "+(i+1)+"/"+order.length+": "+q.t;$("scn").textContent=q.s;
+$("say").textContent="";$("why").textContent="";$("nx").classList.add("hide");
+const o=$("opts");o.innerHTML="";
+const keys=Object.keys(T).sort(()=>Math.random()-.5);
+const gone=hint?keys.filter(k=>k!==q.a).slice(0,2):[];
+keys.forEach(k=>{const b=document.createElement("button");b.textContent=T[k];b.dataset.k=k;
+if(gone.includes(k)){b.disabled=true;b.classList.add("gone")}else b.onclick=()=>ans(k);o.appendChild(b)});
+$("hnt").classList.toggle("hide",!hint);
+left=15;$("tm").style.width="100%";clearInterval(timer);
+timer=setInterval(()=>{left-=.1;$("tm").style.width=(left/15*100)+"%";if(left<=0){clearInterval(timer);ans(null)}},100)}
+function ans(k){
+if(done)return;done=true;clearInterval(timer);
+const q=order[i],ok=k===q.a;
+document.querySelectorAll("#opts button").forEach(b=>{b.disabled=true;if(b.dataset.k===q.a)b.classList.add("ok");else if(b.dataset.k===k)b.classList.add("bad")});
+const bot=$("bot");bot.classList.remove("shake","hop");void bot.offsetWidth;
+if(ok){sc+=100+Math.round(left)*5;st++;best=Math.max(best,st);bot.textContent="😎";bot.classList.add("hop");$("say").textContent=pick(good)}
+else{st=0;lives--;bot.textContent=k===null?"😴":"🤬";bot.classList.add("shake");$("say").textContent=k===null?pick(late):pick(bad)}
+$("why").textContent="Answer: "+T[q.a]+". "+q.w;
+hud();
+const lastQ=i===order.length-1||lives===0;
+$("nx").textContent=lastQ?"See my verdict ⚖️":"Next bubble round 🫧";$("nx").classList.remove("hide")}
+function next(){i++;if(i>=order.length||lives===0)finish();else arena()}
+function finish(){
+$("game").classList.add("hide");$("end").classList.remove("hide");
+let r,e;
+if(lives===0){r="Your robot ran out of patience! 🪫";e="💀"}
+else if(sc>=1100){r="Supreme Court of Machine Learning 👑";e="🏆"}
+else if(sc>=800){r="Senior Data Detective 🕵️";e="🥈"}
+else{r="Junior Intern (with snacks) 🍕";e="🥉"}
+$("rank").textContent=r;$("eb").textContent=e;
+$("fin").textContent="Final score: "+sc+" | Best streak: "+best+" | Cases solved: "+Math.min(i,order.length)+"/"+order.length}
+</script></body></html>
